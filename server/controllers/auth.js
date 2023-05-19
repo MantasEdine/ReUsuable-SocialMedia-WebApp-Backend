@@ -2,7 +2,21 @@ import bcrypt from "bcrypt";
 // to encrypt our password
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { hashPassword } from "../middleware/hashPassword.js";
+import dotenv from "dotenv";
+import { comparePassword } from "../middleware/comparePassword.js";
+import { validate_email } from "../middleware/emailValidator.js";
+import cookieParser from "cookie-parser";
+dotenv.config();
 
+// token age
+const tokenAge = 700000 * 24 * 60 * 60;
+// create a new token
+const create_token = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: tokenAge,
+  });
+};
 // Register User
 
 export const register = async (req, res) => {
@@ -16,23 +30,20 @@ export const register = async (req, res) => {
       friends,
       location,
       occupation,
-      //   here we are distructuring informations from request body and
-      //   from frontend we will have to send an object of these arguments to work out with and dan
-      //    grab it and use it in this fucntion
     } = req.body;
-
-    const salt = await bcrypt.genSalt();
-    // this is going to creat random salt provided by bcrypt
-    // and we will use it to encrypt our password
-
-    const passwordHash = await bcrypt.hash(password, salt);
-    // and here we are encrypting our password so our password wont be exposed
-    // the general idea is to creaat a salt a password and has them togther
+    if (!validate_email(email)) {
+      return res.status(400).json({ error: "Invalid email format." });
+    }
+    const users = await User.find({ email });
+    if (users && users.length) {
+      return res.status(400).json({ error: "Email already used" });
+    }
+    const hPassword = await hashPassword(password);
     const newUser = new User({
       firstName,
       lastName,
       email,
-      password: passwordHash,
+      password: hPassword,
       picturePath,
       friends,
       location,
@@ -40,7 +51,12 @@ export const register = async (req, res) => {
       viewedProfile: Math.floor(Math.random() * 100),
       impressions: Math.floor(Math.random() * 100),
     });
-    const savedUser = await newUser.save();
+    const savedUser = newUser.save();
+    if (!savedUser) {
+      return res.status(400).json({ error: "User was not created" });
+    }
+    const token = create_token(savedUser._id);
+    res.cookie("jwt", token, { httpOnly: true, tokenAge: tokenAge * 1000 });
     res.status(201).json(savedUser);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -52,14 +68,30 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email: email });
-    if (!user) return res.status(400).json({ msg: "User does not exist" });
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ msg: "Invlaid Password" });
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
-    delete user.password;
-    res.status(200).json({ token, user });
+    const user = User.find({ email, password });
+    if (!user) {
+      res.staus(404).json({ error: "This User Doesn't Exist" });
+    }
+    if (!email || !password) {
+      res.status(403).json({ error: "no email or no password" });
+    }
+    const userMail = await User.findOne({ email });
+    if (!userMail) {
+      return res
+        .status(400)
+        .json({ error: "User doesn't exist with this e-amil" });
+    }
+    const result = await comparePassword(password, userMail.password);
+    if (!result) {
+      return res.status(400).json({ error: "password incorrect" });
+    }
+    const token = create_token(user._id);
+    res.cookie("jwt", token, { httpOnly: true, tokenAge: tokenAge * 1000 });
+    res.status(200).json({ email: email, password: password });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+};
+export const logOut = async (req, res) => {
+  req.cookie("jwt", "", { tokenAge: 1 });
 };
