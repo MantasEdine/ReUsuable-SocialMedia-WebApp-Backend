@@ -7,14 +7,16 @@ import multer from "multer";
 import helmet from "helmet";
 import morgan from "morgan";
 import authRoutes from "./routes/auth.js";
+import userRoutes from "./routes/user.js";
+import postRoutes from "./routes/post.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { register } from "./controllers/auth.js";
 import { login } from "./controllers/auth.js";
+import { createPost } from "./controllers/post.js";
 dotenv.config();
 
 // Configurations
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
@@ -50,6 +52,8 @@ const upload = multer({ storage });
 // register = Controller
 app.post("/auth/register", upload.single("picture"), register);
 app.use("/auth", authRoutes);
+app.use("/post", postRoutes);
+app.use("/user", userRoutes);
 // Mongoose Setup
 const Port = process.env.PORT || 6001;
 mongoose

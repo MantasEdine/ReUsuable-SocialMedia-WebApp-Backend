@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 // to encrypt our password
 import jwt from "jsonwebtoken";
-import User from "../models/User.js";
+import { User } from "../models/User.js";
 import { hashPassword } from "../middleware/hashPassword.js";
 import dotenv from "dotenv";
 import { comparePassword } from "../middleware/comparePassword.js";
@@ -57,7 +57,7 @@ export const register = async (req, res) => {
     }
     const token = create_token(savedUser._id);
     res.cookie("jwt", token, { httpOnly: true, tokenAge: tokenAge * 1000 });
-    res.status(201).json(savedUser);
+    res.status(201).json(newUser);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -87,7 +87,7 @@ export const login = async (req, res) => {
     }
     const token = create_token(user._id);
     res.cookie("jwt", token, { httpOnly: true, tokenAge: tokenAge * 1000 });
-    res.status(200).json({ email: email, password: password });
+    res.status(200).json({ email: email });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
